@@ -43,11 +43,11 @@ USER mcp
 # Set production environment
 ENV NODE_ENV=production
 
-# Render uses PORT environment variable
-ENV PORT=10000
+# Render dynamically assigns PORT
+# Don't set a default PORT, let Render handle it
 
-# Expose the port
-EXPOSE $PORT
+# Expose the port (Render will set this)
+EXPOSE 10000
 
 # Health check for Render
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
