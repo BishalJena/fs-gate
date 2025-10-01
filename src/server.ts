@@ -1,9 +1,38 @@
-// src/server.ts - Agricultural AI HTTP Server for Render
+// src/server.ts - Agricultural AI MCP Server for Docker MCP Gateway
 import { config } from "dotenv";
 config(); // Load .env file
 
 import fetch from "node-fetch";
 import { createServer } from 'http';
+
+// MCP Protocol Types
+interface MCPRequest {
+    jsonrpc: "2.0";
+    id: string | number;
+    method: string;
+    params?: any;
+}
+
+interface MCPResponse {
+    jsonrpc: "2.0";
+    id: string | number;
+    result?: any;
+    error?: {
+        code: number;
+        message: string;
+        data?: any;
+    };
+}
+
+interface MCPTool {
+    name: string;
+    description: string;
+    inputSchema: {
+        type: "object";
+        properties: Record<string, any>;
+        required?: string[];
+    };
+}
 
 const PORT = process.env.PORT || 10000;
 
@@ -157,7 +186,164 @@ const toolHandlers = new Map();
 toolHandlers.set('crop-price', cropPriceHandler);
 toolHandlers.set('search', searchHandler);
 
-// HTTP Server for Render deployment
+// MCP Tool Definitions
+const mcpTools: MCPTool[] = [
+    {
+        name: "crop-price",
+        description: "Fetch crop price data from data.gov.in with state/district/commodity filters",
+        inputSchema: {
+            type: "object",
+            properties: {
+                state: {
+                    type: "string",
+                    description: "State filter (e.g., Punjab, Maharashtra)"
+                },
+                district: {
+                    type: "string", 
+                    description: "District filter (e.g., Ludhiana, Mumbai)"
+                },
+                commodity: {
+                    type: "string",
+                    description: "Commodity filter (e.g., Wheat, Rice, Cotton)"
+                },
+                limit: {
+                    type: "number",
+                    description: "Max records to return (default: 50)",
+                    default: 50
+                },
+                offset: {
+                    type: "number", 
+                    description: "Records to skip (default: 0)",
+                    default: 0
+                }
+            }
+        }
+    },
+    {
+        name: "search",
+        description: "Search the web for agricultural information using EXA API",
+        inputSchema: {
+            type: "object",
+            properties: {
+                query: {
+                    type: "string",
+                    description: "Search query for agricultural information"
+                },
+                num_results: {
+                    type: "number",
+                    description: "Number of results to return (default: 5)",
+                    default: 5
+                },
+                include_domains: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Domains to include in search"
+                },
+                exclude_domains: {
+                    type: "array", 
+                    items: { type: "string" },
+                    description: "Domains to exclude from search"
+                }
+            },
+            required: ["query"]
+        }
+    }
+];
+
+// MCP Protocol Handlers
+const handleMCPRequest = async (request: MCPRequest): Promise<MCPResponse> => {
+    try {
+        switch (request.method) {
+            case "initialize":
+                return {
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    result: {
+                        protocolVersion: "2024-11-05",
+                        capabilities: {
+                            tools: {}
+                        },
+                        serverInfo: {
+                            name: "agricultural-ai-mcp",
+                            version: "1.0.0"
+                        }
+                    }
+                };
+
+            case "tools/list":
+                return {
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    result: {
+                        tools: mcpTools
+                    }
+                };
+
+            case "tools/call":
+                const { name, arguments: args } = request.params;
+                const handler = toolHandlers.get(name);
+                
+                if (!handler) {
+                    return {
+                        jsonrpc: "2.0",
+                        id: request.id,
+                        error: {
+                            code: -32601,
+                            message: `Tool '${name}' not found`,
+                            data: { availableTools: Array.from(toolHandlers.keys()) }
+                        }
+                    };
+                }
+
+                const result = await handler(args);
+                
+                if (result.error) {
+                    return {
+                        jsonrpc: "2.0",
+                        id: request.id,
+                        error: {
+                            code: -32603,
+                            message: result.error
+                        }
+                    };
+                }
+
+                return {
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    result: {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(result.data, null, 2)
+                            }
+                        ]
+                    }
+                };
+
+            default:
+                return {
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    error: {
+                        code: -32601,
+                        message: `Method '${request.method}' not found`
+                    }
+                };
+        }
+    } catch (error) {
+        return {
+            jsonrpc: "2.0",
+            id: request.id,
+            error: {
+                code: -32603,
+                message: `Internal error: ${String(error)}`
+            }
+        };
+    }
+};
+
+// Hybrid Server: HTTP + MCP Protocol Support
 const httpServer = createServer(async (req, res) => {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -170,18 +356,54 @@ const httpServer = createServer(async (req, res) => {
         return;
     }
 
+    // MCP Protocol Endpoint (for Docker MCP Gateway)
+    if (req.url === '/mcp' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+
+        req.on('end', async () => {
+            try {
+                const mcpRequest: MCPRequest = JSON.parse(body);
+                const mcpResponse = await handleMCPRequest(mcpRequest);
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(mcpResponse));
+            } catch (error) {
+                const errorResponse: MCPResponse = {
+                    jsonrpc: "2.0",
+                    id: 0,
+                    error: {
+                        code: -32700,
+                        message: `Parse error: ${String(error)}`
+                    }
+                };
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(errorResponse));
+            }
+        });
+        return;
+    }
+
     // Health check endpoint
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             status: 'healthy',
             server: 'agricultural-ai-mcp',
+            protocols: ['http', 'mcp'],
             tools: ['crop-price', 'search'],
             timestamp: new Date().toISOString(),
             environment: {
                 datagovin_key_set: !!process.env.DATAGOVIN_API_KEY,
                 exa_key_set: !!process.env.EXA_API_KEY,
                 port: PORT
+            },
+            mcp: {
+                endpoint: '/mcp',
+                protocol_version: '2024-11-05',
+                capabilities: ['tools']
             }
         }));
         return;
@@ -193,7 +415,11 @@ const httpServer = createServer(async (req, res) => {
         res.end(JSON.stringify({
             name: 'Agricultural AI MCP Server',
             version: '1.0.0',
-            description: 'HTTP server providing crop price data and web search for agricultural AI chatbots',
+            description: 'Hybrid server: HTTP API + MCP Protocol for Docker MCP Gateway integration',
+            protocols: {
+                http: 'Direct HTTP API access',
+                mcp: 'Model Context Protocol via /mcp endpoint'
+            },
             tools: [
                 {
                     name: 'crop-price',
@@ -221,7 +447,10 @@ const httpServer = createServer(async (req, res) => {
                     }
                 }
             ],
-            usage: 'POST to /tools/{tool-name} with JSON body containing tool parameters',
+            usage: {
+                http: 'POST to /tools/{tool-name} with JSON body containing tool parameters',
+                mcp: 'POST to /mcp with MCP protocol JSON-RPC requests'
+            },
             examples: {
                 'crop-price': {
                     url: '/tools/crop-price',
@@ -281,16 +510,17 @@ const httpServer = createServer(async (req, res) => {
 httpServer.listen(PORT, () => {
     const isProduction = process.env.NODE_ENV === 'production';
     const baseUrl = isProduction ? 'https://fs-gate.onrender.com' : `http://localhost:${PORT}`;
-    
-    console.log(`🚀 Agricultural AI Server running on port ${PORT}`);
-    console.log(`🌾 Crop price tool: ${baseUrl}/tools/crop-price`);
-    console.log(`🔍 Search tool: ${baseUrl}/tools/search`);
+
+    console.log(`🚀 Agricultural AI MCP Server running on port ${PORT}`);
+    console.log(`🌾 HTTP: Crop price tool: ${baseUrl}/tools/crop-price`);
+    console.log(`🔍 HTTP: Search tool: ${baseUrl}/tools/search`);
+    console.log(`🤖 MCP: Protocol endpoint: ${baseUrl}/mcp`);
     console.log(`❤️  Health check: ${baseUrl}/health`);
     console.log(`📖 API docs: ${baseUrl}/`);
-    
+
     if (isProduction) {
-        console.log(`🎯 Live on Render! Ready for hackathon judges!`);
+        console.log(`🎯 Live with Docker MCP Gateway support! Ready for hackathon!`);
     } else {
-        console.log(`🎯 Ready for hackathon deployment on Render!`);
+        console.log(`🎯 Ready for Docker MCP Gateway integration and cloud deployment!`);
     }
 });

@@ -1,0 +1,216 @@
+name: agricultural-ai-production
+displayName: Agricultural AI Production Catalog
+description: Production-ready MCP servers for agricultural intelligence and crop data analysis
+
+registry:
+  crop-price-server:
+    description: "Production MCP server for fetching Indian crop price data from data.gov.in with comprehensive filtering"
+    title: "Crop Price Intelligence"
+    type: "server"
+    dateAdded: "2025-02-10T00:00:00Z"
+    image: "agricultural-ai-mcp:latest"
+    
+    # Tools provided by this server
+    tools:
+      - name: "crop-price"
+        description: "Fetch crop price data with state/district/commodity filters"
+    
+    # Required secrets
+    secrets:
+      - name: "crop-price-server.datagovin_api_key"
+        env: "DATAGOVIN_API_KEY"
+        example: "your-datagovin-api-key-here"
+        description: "API key from data.gov.in for accessing crop price dataset"
+      - name: "crop-price-server.datagovin_resource_id"
+        env: "DATAGOVIN_RESOURCE_ID"
+        example: "35985678-0d79-46b4-9ed6-6f13308a1d24"
+        description: "Resource ID for the crop price dataset"
+    
+    # Environment variables
+    env:
+      - name: "DATAGOVIN_API_KEY"
+        value: "{{crop-price-server.datagovin_api_key}}"
+      - name: "DATAGOVIN_RESOURCE_ID"
+        value: "{{crop-price-server.datagovin_resource_id}}"
+      - name: "NODE_ENV"
+        value: "production"
+    
+    # Command line arguments for MCP protocol
+    command:
+      - "node"
+      - "dist/server.js"
+    
+    # Port configuration
+    ports:
+      - "10000:10000"
+    
+    # Configuration schema
+    config:
+      - name: "crop-price-server"
+        description: "Crop price server configuration"
+        type: "object"
+        properties:
+          datagovin_api_key:
+            type: "string"
+            description: "API key for data.gov.in"
+          datagovin_resource_id:
+            type: "string"
+            description: "Resource ID for crop price dataset"
+        required: ["datagovin_api_key"]
+    
+    # Metadata
+    metadata:
+      category: "agriculture"
+      tags: ["agriculture", "data", "india", "prices", "api", "crops"]
+      license: "MIT License"
+      owner: "hackathon-team"
+      maintainer: "agricultural-ai-team"
+    
+    # Documentation links
+    readme: "https://github.com/your-username/agricultural-ai-mcp/README.md"
+    source: "https://github.com/your-username/agricultural-ai-mcp"
+    icon: "🌾"
+
+  exa-search-server:
+    description: "Production MCP server for web search and agricultural content retrieval using EXA API"
+    title: "Agricultural Web Intelligence"
+    type: "server"
+    dateAdded: "2025-02-10T00:00:00Z"
+    image: "agricultural-ai-mcp:latest"
+    
+    # Tools provided by this server
+    tools:
+      - name: "search"
+        description: "Search the web for agricultural information and research"
+    
+    # Required secrets
+    secrets:
+      - name: "exa-search-server.exa_api_key"
+        env: "EXA_API_KEY"
+        example: "your-exa-api-key-here"
+        description: "API key for EXA search service"
+    
+    # Environment variables
+    env:
+      - name: "EXA_API_KEY"
+        value: "{{exa-search-server.exa_api_key}}"
+      - name: "NODE_ENV"
+        value: "production"
+    
+    # Command line arguments
+    command:
+      - "node"
+      - "dist/server.js"
+    
+    # Port configuration
+    ports:
+      - "10000:10000"
+    
+    # Configuration schema
+    config:
+      - name: "exa-search-server"
+        description: "EXA search server configuration"
+        type: "object"
+        properties:
+          exa_api_key:
+            type: "string"
+            description: "API key for EXA search service"
+        required: ["exa_api_key"]
+    
+    # Metadata
+    metadata:
+      category: "search"
+      tags: ["search", "web", "content", "retrieval", "agriculture", "research"]
+      license: "MIT License"
+      owner: "hackathon-team"
+      maintainer: "agricultural-ai-team"
+    
+    # Documentation links
+    readme: "https://github.com/your-username/agricultural-ai-mcp/README.md"
+    source: "https://github.com/your-username/agricultural-ai-mcp"
+    icon: "🔍"
+
+  agricultural-ai-unified:
+    description: "Unified MCP server providing both crop price data and web search capabilities for comprehensive agricultural intelligence"
+    title: "Agricultural AI Gateway"
+    type: "server"
+    dateAdded: "2025-02-10T00:00:00Z"
+    image: "agricultural-ai-mcp:latest"
+    
+    # All tools in one server
+    tools:
+      - name: "crop-price"
+        description: "Fetch crop price data from data.gov.in"
+      - name: "search"
+        description: "Search the web for agricultural information"
+    
+    # All required secrets
+    secrets:
+      - name: "agricultural-ai-unified.datagovin_api_key"
+        env: "DATAGOVIN_API_KEY"
+        example: "your-datagovin-api-key-here"
+        description: "API key from data.gov.in"
+      - name: "agricultural-ai-unified.exa_api_key"
+        env: "EXA_API_KEY"
+        example: "your-exa-api-key-here"
+        description: "API key for EXA search service"
+    
+    # Environment variables
+    env:
+      - name: "DATAGOVIN_API_KEY"
+        value: "{{agricultural-ai-unified.datagovin_api_key}}"
+      - name: "EXA_API_KEY"
+        value: "{{agricultural-ai-unified.exa_api_key}}"
+      - name: "NODE_ENV"
+        value: "production"
+      - name: "PORT"
+        value: "10000"
+    
+    # Command line arguments
+    command:
+      - "node"
+      - "dist/server.js"
+    
+    # Port configuration
+    ports:
+      - "10000:10000"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    
+    # Configuration schema
+    config:
+      - name: "agricultural-ai-unified"
+        description: "Unified agricultural AI server configuration"
+        type: "object"
+        properties:
+          datagovin_api_key:
+            type: "string"
+            description: "API key for data.gov.in crop price data"
+          exa_api_key:
+            type: "string"
+            description: "API key for EXA search service"
+          port:
+            type: "string"
+            description: "Server port"
+            default: "10000"
+        required: ["datagovin_api_key", "exa_api_key"]
+    
+    # Metadata
+    metadata:
+      category: "agriculture"
+      tags: ["agriculture", "ai", "crops", "search", "intelligence", "unified"]
+      license: "MIT License"
+      owner: "hackathon-team"
+      maintainer: "agricultural-ai-team"
+      featured: true
+    
+    # Documentation links
+    readme: "https://github.com/your-username/agricultural-ai-mcp/README.md"
+    source: "https://github.com/your-username/agricultural-ai-mcp"
+    documentation: "https://github.com/your-username/agricultural-ai-mcp/docs"
+    icon: "🤖🌾"
