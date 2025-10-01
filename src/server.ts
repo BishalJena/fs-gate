@@ -279,10 +279,18 @@ const httpServer = createServer(async (req, res) => {
 
 // Start HTTP server
 httpServer.listen(PORT, () => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const baseUrl = isProduction ? 'https://fs-gate.onrender.com' : `http://localhost:${PORT}`;
+    
     console.log(`🚀 Agricultural AI Server running on port ${PORT}`);
-    console.log(`🌾 Crop price tool: http://localhost:${PORT}/tools/crop-price`);
-    console.log(`🔍 Search tool: http://localhost:${PORT}/tools/search`);
-    console.log(`❤️  Health check: http://localhost:${PORT}/health`);
-    console.log(`📖 API docs: http://localhost:${PORT}/`);
-    console.log(`🎯 Ready for hackathon deployment on Render!`);
+    console.log(`🌾 Crop price tool: ${baseUrl}/tools/crop-price`);
+    console.log(`🔍 Search tool: ${baseUrl}/tools/search`);
+    console.log(`❤️  Health check: ${baseUrl}/health`);
+    console.log(`📖 API docs: ${baseUrl}/`);
+    
+    if (isProduction) {
+        console.log(`🎯 Live on Render! Ready for hackathon judges!`);
+    } else {
+        console.log(`🎯 Ready for hackathon deployment on Render!`);
+    }
 });
