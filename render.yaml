@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: agricultural-ai-mcp
+    runtime: docker
+    repo: https://github.com/your-username/your-repo-name.git
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATAGOVIN_API_KEY
+        value: 579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b
+      - key: EXA_API_KEY  
+        value: 579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b
+      - key: DATAGOVIN_RESOURCE_ID
+        value: 35985678-0d79-46b4-9ed6-6f13308a1d24
+      - key: PORT
+        value: 10000
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+    healthCheckPath: /health
